@@ -10,5 +10,5 @@
     "outDir": "out/preload",
     "rootDir": "src"
   },
-  "include": ["src/preload/**/*", "src/shared/**/*"]
+  "include": ["src/preload/**/*", "src/shared/**/*", "src/main/ipc-channels.ts"]
 }

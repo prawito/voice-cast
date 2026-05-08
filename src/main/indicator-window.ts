@@ -40,7 +40,6 @@ export class IndicatorWindow {
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: false,
         preload: join(__dirname, '../preload/index.js')
       }
     })

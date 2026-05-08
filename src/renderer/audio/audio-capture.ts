@@ -53,6 +53,7 @@ export class AudioCapture {
     this.capturing = false
     const durationMs = performance.now() - this.startTime
 
+    if (this.processor) this.processor.onaudioprocess = null
     this.processor?.disconnect()
     this.source?.disconnect()
     this.stream?.getTracks().forEach((t) => t.stop())
