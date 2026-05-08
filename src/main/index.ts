@@ -14,8 +14,8 @@ if (!gotLock) {
     })
   })
 
-  app.on('window-all-closed', (event: Electron.Event) => {
-    event.preventDefault()
+  app.on('window-all-closed', () => {
+    // Stay alive: we're a tray app (no visible main window).
   })
 
   app.on('will-quit', () => {
