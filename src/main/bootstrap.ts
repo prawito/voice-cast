@@ -1,8 +1,11 @@
-import { ipcMain } from 'electron'
+import { app, ipcMain } from 'electron'
 import { IndicatorWindow } from './indicator-window'
 import { createTray } from './tray'
 import { TranscriptionService } from './transcription-service'
+import { HotkeyManager } from './hotkey-manager'
+import { RecordingController } from './recording-controller'
 import { IPC } from './ipc-channels'
+import { MAX_RECORDING_MS } from '../shared/constants'
 import type { AudioSubmitPayload, AudioSubmitResult } from '../shared/types'
 
 export async function bootstrap(): Promise<void> {
@@ -10,34 +13,78 @@ export async function bootstrap(): Promise<void> {
 
   const indicator = new IndicatorWindow()
   await indicator.create()
-  const tray = createTray(() => indicator.destroy())
+  const tray = createTray(() => {
+    indicator.destroy()
+  })
   void tray
 
+  const controller = new RecordingController()
+  const hotkey = new HotkeyManager()
   const transcription = new TranscriptionService()
+
+  let recordingTimer: NodeJS.Timeout | null = null
+
+  controller.on('state', (state, message) => {
+    indicator.pushState({ state, message })
+  })
+
+  controller.on('startRecording', () => {
+    indicator.show()
+    indicator.sendStart()
+    if (recordingTimer) clearTimeout(recordingTimer)
+    recordingTimer = setTimeout(() => {
+      console.warn('[VoiceCast] max recording duration reached, auto-stopping')
+      controller.toggle()
+    }, MAX_RECORDING_MS)
+  })
+
+  controller.on('stopRecording', () => {
+    if (recordingTimer) {
+      clearTimeout(recordingTimer)
+      recordingTimer = null
+    }
+    indicator.sendStop()
+  })
 
   ipcMain.handle(
     IPC.AUDIO_SUBMIT,
-    async (_event, payload: AudioSubmitPayload): Promise<AudioSubmitResult> => {
+    async (_e, payload: AudioSubmitPayload): Promise<AudioSubmitResult> => {
       console.log(
         `[VoiceCast] audio submitted: ${payload.buffer.byteLength} bytes, ${payload.durationMs.toFixed(0)} ms`
       )
-      indicator.pushState({ state: 'transcribing', message: 'transcribing…' })
       try {
         const text = await transcription.transcribe(payload.buffer)
-        console.log('[VoiceCast] transcript:', JSON.stringify(text))
-        indicator.pushState({ state: 'idle', message: text || 'no text' })
+        if (!text) {
+          controller.setError('no text recognized')
+          fadeIdle(controller, indicator, 1500)
+          return { ok: true, text: '' }
+        }
+        // injection happens in next task — for now just preview
+        controller.setDone(text)
+        fadeIdle(controller, indicator, 1000)
         return { ok: true, text }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         console.error('[VoiceCast] transcription error:', message)
-        indicator.pushState({ state: 'error', message: 'transcription failed' })
+        controller.setError('transcription failed')
+        fadeIdle(controller, indicator, 1500)
         return { ok: false, error: message }
       }
     }
   )
 
-  indicator.show()
-  indicator.pushState({ state: 'idle', message: 'ready' })
+  hotkey.registerToggle(() => controller.toggle())
 
-  console.log('[VoiceCast] bootstrap complete (no hotkey wired yet)')
+  app.on('will-quit', () => hotkey.unregisterAll())
+
+  indicator.show()
+  controller.reset()
+  console.log('[VoiceCast] bootstrap complete; press Cmd+Shift+V')
+}
+
+function fadeIdle(controller: RecordingController, indicator: IndicatorWindow, delayMs: number) {
+  setTimeout(() => {
+    controller.reset()
+    indicator.hide()
+  }, delayMs)
 }
