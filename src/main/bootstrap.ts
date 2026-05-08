@@ -2,12 +2,13 @@ import { app, ipcMain } from 'electron'
 import { IndicatorWindow } from './indicator-window'
 import { createTray } from './tray'
 import { TranscriptionService } from './transcription-service'
+import { InjectionService } from './injection-service'
 import { HotkeyManager } from './hotkey-manager'
 import { RecordingController } from './recording-controller'
+import { checkPermissions, logPermissionGuidance } from './permissions'
 import { IPC } from './ipc-channels'
 import { MAX_RECORDING_MS } from '../shared/constants'
 import type { AudioSubmitPayload, AudioSubmitResult } from '../shared/types'
-import { checkPermissions, logPermissionGuidance } from './permissions'
 
 export async function bootstrap(): Promise<void> {
   console.log('[VoiceCast] bootstrap starting')
@@ -17,14 +18,13 @@ export async function bootstrap(): Promise<void> {
 
   const indicator = new IndicatorWindow()
   await indicator.create()
-  const tray = createTray(() => {
-    indicator.destroy()
-  })
+  const tray = createTray(() => indicator.destroy())
   void tray
 
   const controller = new RecordingController()
   const hotkey = new HotkeyManager()
   const transcription = new TranscriptionService()
+  const injection = new InjectionService()
 
   let recordingTimer: NodeJS.Timeout | null = null
 
@@ -56,37 +56,56 @@ export async function bootstrap(): Promise<void> {
       console.log(
         `[VoiceCast] audio submitted: ${payload.buffer.byteLength} bytes, ${payload.durationMs.toFixed(0)} ms`
       )
+
+      if (payload.buffer.byteLength === 0) {
+        controller.setError('no audio captured')
+        scheduleIdle(controller, indicator, 1500)
+        return { ok: true, text: '' }
+      }
+
+      let text: string
       try {
-        const text = await transcription.transcribe(payload.buffer)
-        if (!text) {
-          controller.setError('no text recognized')
-          fadeIdle(controller, indicator, 1500)
-          return { ok: true, text: '' }
-        }
-        // injection happens in next task — for now just preview
-        controller.setDone(text)
-        fadeIdle(controller, indicator, 1000)
-        return { ok: true, text }
+        text = await transcription.transcribe(payload.buffer)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         console.error('[VoiceCast] transcription error:', message)
         controller.setError('transcription failed')
-        fadeIdle(controller, indicator, 1500)
+        scheduleIdle(controller, indicator, 1500)
         return { ok: false, error: message }
       }
+
+      if (!text.trim()) {
+        controller.setError('no text recognized')
+        scheduleIdle(controller, indicator, 1500)
+        return { ok: true, text: '' }
+      }
+
+      controller.setInjecting()
+      const result = await injection.inject(text)
+      if (result.pasted) {
+        controller.setDone(text)
+        scheduleIdle(controller, indicator, 1000)
+      } else {
+        controller.setClipboardOnly(text)
+        if (result.error) console.warn('[VoiceCast] paste fallback:', result.error)
+        scheduleIdle(controller, indicator, 2000)
+      }
+      return { ok: true, text }
     }
   )
 
   hotkey.registerToggle(() => controller.toggle())
-
   app.on('will-quit', () => hotkey.unregisterAll())
 
-  indicator.show()
   controller.reset()
-  console.log('[VoiceCast] bootstrap complete; press Cmd+Shift+V')
+  console.log('[VoiceCast] ready — press Cmd+Shift+V to dictate')
 }
 
-function fadeIdle(controller: RecordingController, indicator: IndicatorWindow, delayMs: number) {
+function scheduleIdle(
+  controller: RecordingController,
+  indicator: IndicatorWindow,
+  delayMs: number
+) {
   setTimeout(() => {
     controller.reset()
     indicator.hide()
