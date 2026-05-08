@@ -7,9 +7,13 @@ import { RecordingController } from './recording-controller'
 import { IPC } from './ipc-channels'
 import { MAX_RECORDING_MS } from '../shared/constants'
 import type { AudioSubmitPayload, AudioSubmitResult } from '../shared/types'
+import { checkPermissions, logPermissionGuidance } from './permissions'
 
 export async function bootstrap(): Promise<void> {
   console.log('[VoiceCast] bootstrap starting')
+
+  const permissions = checkPermissions()
+  logPermissionGuidance(permissions)
 
   const indicator = new IndicatorWindow()
   await indicator.create()
