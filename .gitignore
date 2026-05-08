@@ -1,0 +1,27 @@
+node_modules/
+out/
+dist/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+.cache/
+.vite/
+.turbo/
+coverage/
+.idea/
+.vscode/
+!.vscode/extensions.json
+*.tsbuildinfo
+
+# Whisper model cache
+.nodejs-whisper/
+models/
+
+# OS
+Thumbs.db
+
+# Temporary
+tmp/
+*.swp
