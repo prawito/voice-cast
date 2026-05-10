@@ -1,6 +1,6 @@
 export const HOTKEY_TOGGLE = 'CommandOrControl+Shift+V'
+export const HOTKEY_SETTINGS = 'CommandOrControl+Shift+,'
 export const TARGET_SAMPLE_RATE = 16000
-export const WHISPER_MODEL_NAME = 'base'
 export const WHISPER_LANGUAGE = 'id'
 export const MAX_RECORDING_MS = 60_000
 export const SILENCE_RMS_THRESHOLD = 0.003

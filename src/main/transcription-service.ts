@@ -1,14 +1,47 @@
-import { promises as fs } from 'node:fs'
+import { promises as fs, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { WHISPER_LANGUAGE, WHISPER_MODEL_NAME } from '../shared/constants'
+import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
+import { WHISPER_LANGUAGE } from '../shared/constants'
+import type { SettingsStore } from './settings-store'
+
+const require = createRequire(import.meta.url)
+
+let shelljsConfigured = false
+
+function configureShelljsForElectron(): void {
+  if (shelljsConfigured) return
+  const candidates = ['/opt/homebrew/bin/node', '/usr/local/bin/node', '/usr/bin/node']
+  let nodePath = candidates.find((p) => existsSync(p))
+  if (!nodePath) {
+    try {
+      nodePath = execFileSync('/usr/bin/which', ['node'], { encoding: 'utf-8' }).trim()
+    } catch {
+      // ignore — let shelljs fail with its own error
+    }
+  }
+  if (nodePath) {
+    const shelljs = require('shelljs')
+    shelljs.config.execPath = nodePath
+    console.log(`[VoiceCast] shelljs.config.execPath set to ${nodePath}`)
+  }
+  shelljsConfigured = true
+}
 
 export class TranscriptionService {
+  constructor(private settings: SettingsStore) {}
+
   async transcribe(wav: ArrayBuffer): Promise<string> {
     if (wav.byteLength === 0) {
       throw new Error('Empty audio buffer')
     }
+
+    configureShelljsForElectron()
+
+    const modelName = this.settings.get().modelName
+    console.log(`[VoiceCast] transcribing with model=${modelName}`)
 
     const tmpFile = join(tmpdir(), `voicecast-${randomUUID()}.wav`)
     await fs.writeFile(tmpFile, Buffer.from(wav))
@@ -16,8 +49,8 @@ export class TranscriptionService {
     try {
       const { nodewhisper } = await import('nodejs-whisper')
       const result = await nodewhisper(tmpFile, {
-        modelName: WHISPER_MODEL_NAME,
-        autoDownloadModelName: WHISPER_MODEL_NAME,
+        modelName,
+        autoDownloadModelName: modelName,
         removeWavFileAfterTranscription: false,
         whisperOptions: {
           language: WHISPER_LANGUAGE,

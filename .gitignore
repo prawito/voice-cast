@@ -25,3 +25,6 @@ Thumbs.db
 # Temporary
 tmp/
 *.swp
+
+# Local agent / IDE state
+.claude/

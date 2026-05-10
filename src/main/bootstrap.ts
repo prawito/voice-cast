@@ -1,14 +1,21 @@
 import { app, ipcMain } from 'electron'
 import { IndicatorWindow } from './indicator-window'
+import { SettingsWindow } from './settings-window'
 import { createTray } from './tray'
 import { TranscriptionService } from './transcription-service'
 import { InjectionService } from './injection-service'
 import { HotkeyManager } from './hotkey-manager'
 import { RecordingController } from './recording-controller'
+import { SettingsStore } from './settings-store'
+import { ModelManager } from './model-manager'
 import { checkPermissions, logPermissionGuidance } from './permissions'
 import { IPC } from './ipc-channels'
 import { MAX_RECORDING_MS } from '../shared/constants'
-import type { AudioSubmitPayload, AudioSubmitResult } from '../shared/types'
+import type {
+  AudioSubmitPayload,
+  AudioSubmitResult,
+  Settings
+} from '../shared/types'
 
 export async function bootstrap(): Promise<void> {
   console.log('[VoiceCast] bootstrap starting')
@@ -16,14 +23,33 @@ export async function bootstrap(): Promise<void> {
   const permissions = checkPermissions()
   logPermissionGuidance(permissions)
 
+  const settings = new SettingsStore()
+  await settings.load()
+
+  const models = new ModelManager()
+
   const indicator = new IndicatorWindow()
   await indicator.create()
-  const tray = createTray(() => indicator.destroy())
+  indicator.webContents?.on('console-message', (_e, level, msg, line, src) => {
+    const tag = ['LOG', 'WARN', 'ERROR', 'INFO'][level] ?? `L${level}`
+    console.log(`[renderer ${tag}] ${msg}  (${src}:${line})`)
+  })
+
+  const settingsWindow = new SettingsWindow()
+  const tray = createTray({
+    onSettings: () => {
+      settingsWindow.open().catch((err) => console.error('[VoiceCast] settings open error:', err))
+    },
+    onQuit: () => {
+      indicator.destroy()
+      settingsWindow.close()
+    }
+  })
   void tray
 
   const controller = new RecordingController()
   const hotkey = new HotkeyManager()
-  const transcription = new TranscriptionService()
+  const transcription = new TranscriptionService(settings)
   const injection = new InjectionService()
 
   let recordingTimer: NodeJS.Timeout | null = null
@@ -48,6 +74,10 @@ export async function bootstrap(): Promise<void> {
       recordingTimer = null
     }
     indicator.sendStop()
+  })
+
+  models.on('progress', (payload) => {
+    settingsWindow.pushProgress(payload)
   })
 
   ipcMain.handle(
@@ -94,11 +124,34 @@ export async function bootstrap(): Promise<void> {
     }
   )
 
-  hotkey.registerToggle(() => controller.toggle())
+  ipcMain.handle(IPC.SETTINGS_GET, () => settings.get())
+  ipcMain.handle(IPC.SETTINGS_UPDATE, async (_e, patch: Partial<Settings>) => {
+    return settings.update(patch)
+  })
+  ipcMain.handle(IPC.MODELS_LIST, () => models.list())
+  ipcMain.handle(IPC.MODEL_DOWNLOAD, async (_e, name: string) => {
+    try {
+      await models.download(name)
+      return { ok: true }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { ok: false, error: message }
+    }
+  })
+
+  hotkey.registerToggle(() => {
+    console.log(`[VoiceCast] hotkey fired (state=${controller.state()})`)
+    controller.toggle()
+  })
+  hotkey.registerSettings(() => {
+    settingsWindow.open().catch((err) => console.error('[VoiceCast] settings open error:', err))
+  })
   app.on('will-quit', () => hotkey.unregisterAll())
 
   controller.reset()
-  console.log('[VoiceCast] ready — press Cmd+Shift+V to dictate')
+  console.log('[VoiceCast] ready — press Cmd+Shift+V to dictate, Cmd+Shift+, for Settings')
+
+  await settingsWindow.open()
 }
 
 function scheduleIdle(

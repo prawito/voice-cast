@@ -6,16 +6,17 @@ import { Spinner } from './Spinner'
 interface Props {
   state: AppState
   message?: string
+  levels?: number[]
 }
 
-export function Indicator({ state, message }: Props) {
+export function Indicator({ state, message, levels }: Props) {
   return (
     <div
       className={`flex h-[72px] w-[220px] items-center gap-3 rounded-2xl bg-neutral-900/90 px-4 text-white shadow-lg ring-1 ring-white/10 backdrop-blur transition-opacity duration-300 ${
         state === 'idle' ? 'opacity-0' : 'opacity-100'
       }`}
     >
-      <Glyph state={state} />
+      <Glyph state={state} levels={levels} />
       <div className="flex min-w-0 flex-col leading-tight">
         <span className="text-sm font-semibold">{label(state)}</span>
         {message ? (
@@ -26,13 +27,13 @@ export function Indicator({ state, message }: Props) {
   )
 }
 
-function Glyph({ state }: { state: AppState }) {
+function Glyph({ state, levels }: { state: AppState; levels?: number[] }) {
   switch (state) {
     case 'recording':
       return (
         <div className="flex items-center gap-2">
           <Mic className="h-4 w-4 text-rose-400" />
-          <WaveAnim />
+          <WaveAnim levels={levels} />
         </div>
       )
     case 'transcribing':

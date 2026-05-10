@@ -4,7 +4,10 @@ import type {
   WindowVoiceCastApi,
   StateUpdatePayload,
   AudioSubmitPayload,
-  AudioSubmitResult
+  AudioSubmitResult,
+  Settings,
+  ModelInfo,
+  ModelProgress
 } from '../shared/types'
 
 const api: WindowVoiceCastApi = {
@@ -25,6 +28,23 @@ const api: WindowVoiceCastApi = {
   },
   submitAudio(payload: AudioSubmitPayload): Promise<AudioSubmitResult> {
     return ipcRenderer.invoke(IPC.AUDIO_SUBMIT, payload)
+  },
+  getSettings(): Promise<Settings> {
+    return ipcRenderer.invoke(IPC.SETTINGS_GET)
+  },
+  updateSettings(patch: Partial<Settings>): Promise<Settings> {
+    return ipcRenderer.invoke(IPC.SETTINGS_UPDATE, patch)
+  },
+  listModels(): Promise<ModelInfo[]> {
+    return ipcRenderer.invoke(IPC.MODELS_LIST)
+  },
+  downloadModel(name: string): Promise<{ ok: boolean; error?: string }> {
+    return ipcRenderer.invoke(IPC.MODEL_DOWNLOAD, name)
+  },
+  onModelProgress(cb) {
+    const listener = (_e: unknown, payload: ModelProgress) => cb(payload)
+    ipcRenderer.on(IPC.MODEL_PROGRESS, listener)
+    return () => ipcRenderer.removeListener(IPC.MODEL_PROGRESS, listener)
   }
 }
 

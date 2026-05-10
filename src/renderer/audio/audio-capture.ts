@@ -15,6 +15,7 @@ export class AudioCapture {
   private totalSamples = 0
   private startTime = 0
   private capturing = false
+  onLevel: ((level: number) => void) | null = null
 
   async start(): Promise<void> {
     if (this.capturing) return
@@ -25,21 +26,47 @@ export class AudioCapture {
         autoGainControl: false
       }
     })
+    const tracks = this.stream.getAudioTracks()
+    console.log(
+      `[AudioCapture] mic acquired, tracks=${tracks.length}, label="${tracks[0]?.label}", enabled=${tracks[0]?.enabled}, muted=${tracks[0]?.muted}, readyState=${tracks[0]?.readyState}`
+    )
+
     this.context = new AudioContext()
+    if (this.context.state === 'suspended') {
+      console.log('[AudioCapture] AudioContext suspended — resuming')
+      await this.context.resume()
+    }
+    console.log(
+      `[AudioCapture] AudioContext state=${this.context.state}, sampleRate=${this.context.sampleRate}`
+    )
+
     this.source = this.context.createMediaStreamSource(this.stream)
     const bufferSize = 4096
     const channelCount = this.source.channelCount || 1
     this.processor = this.context.createScriptProcessor(bufferSize, channelCount, channelCount)
     this.buffersByChannel = Array.from({ length: channelCount }, () => [])
     this.totalSamples = 0
+    let chunkCount = 0
 
     this.processor.onaudioprocess = (event) => {
       const input = event.inputBuffer
+      let levelSum = 0
+      let levelCount = 0
       for (let c = 0; c < input.numberOfChannels; c++) {
         const data = input.getChannelData(c)
         this.buffersByChannel[c].push(new Float32Array(data))
+        for (let i = 0; i < data.length; i++) levelSum += data[i] * data[i]
+        levelCount += data.length
       }
       this.totalSamples += input.length
+      const rms = levelCount > 0 ? Math.sqrt(levelSum / levelCount) : 0
+      chunkCount++
+      if (chunkCount === 1 || chunkCount % 20 === 0) {
+        console.log(
+          `[AudioCapture] chunk ${chunkCount}: samples=${input.length}, channels=${input.numberOfChannels}, rms=${rms.toFixed(5)}`
+        )
+      }
+      if (this.onLevel) this.onLevel(rms)
     }
 
     this.source.connect(this.processor)
