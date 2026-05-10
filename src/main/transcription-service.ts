@@ -4,7 +4,6 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { WHISPER_LANGUAGE } from '../shared/constants'
 import type { SettingsStore } from './settings-store'
 
 const require = createRequire(import.meta.url)
@@ -40,8 +39,8 @@ export class TranscriptionService {
 
     configureShelljsForElectron()
 
-    const modelName = this.settings.get().modelName
-    console.log(`[VoiceCast] transcribing with model=${modelName}`)
+    const { modelName, language } = this.settings.get()
+    console.log(`[VoiceCast] transcribing with model=${modelName}, language=${language}`)
 
     const tmpFile = join(tmpdir(), `voicecast-${randomUUID()}.wav`)
     await fs.writeFile(tmpFile, Buffer.from(wav))
@@ -53,7 +52,7 @@ export class TranscriptionService {
         autoDownloadModelName: modelName,
         removeWavFileAfterTranscription: false,
         whisperOptions: {
-          language: WHISPER_LANGUAGE,
+          language,
           outputInText: true,
           outputInJson: false,
           outputInSrt: false,

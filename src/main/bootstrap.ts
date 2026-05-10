@@ -14,6 +14,8 @@ import { MAX_RECORDING_MS } from '../shared/constants'
 import type {
   AudioSubmitPayload,
   AudioSubmitResult,
+  HotkeyId,
+  RebindResult,
   Settings
 } from '../shared/types'
 
@@ -139,17 +141,42 @@ export async function bootstrap(): Promise<void> {
     }
   })
 
-  hotkey.registerToggle(() => {
+  hotkey.setHandler('toggle', () => {
     console.log(`[VoiceCast] hotkey fired (state=${controller.state()})`)
     controller.toggle()
   })
-  hotkey.registerSettings(() => {
+  hotkey.setHandler('settings', () => {
     settingsWindow.open().catch((err) => console.error('[VoiceCast] settings open error:', err))
   })
+  const applyResult = hotkey.applyAll(settings.get().hotkeys)
+  if (!applyResult.ok) {
+    console.warn(`[VoiceCast] hotkey registration failed for: ${applyResult.failed.join(', ')}`)
+  }
   app.on('will-quit', () => hotkey.unregisterAll())
 
+  ipcMain.handle(
+    IPC.HOTKEY_REBIND,
+    async (_e, payload: { which: HotkeyId; accelerator: string | null }): Promise<RebindResult> => {
+      const result = hotkey.rebind(payload.which, payload.accelerator)
+      if (result.ok) {
+        await settings.update({
+          hotkeys: { ...settings.get().hotkeys, [payload.which]: payload.accelerator }
+        })
+      }
+      return result
+    }
+  )
+
+  ipcMain.handle(IPC.HOTKEY_LISTENING, (_e, listening: boolean) => {
+    if (listening) hotkey.pauseAll()
+    else hotkey.resumeAll()
+  })
+
   controller.reset()
-  console.log('[VoiceCast] ready — press Cmd+Shift+V to dictate, Cmd+Shift+, for Settings')
+  const { toggle, settings: settingsAccel } = settings.get().hotkeys
+  console.log(
+    `[VoiceCast] ready — toggle=${toggle ?? '(none)'}, settings=${settingsAccel ?? '(none)'}`
+  )
 
   await settingsWindow.open()
 }

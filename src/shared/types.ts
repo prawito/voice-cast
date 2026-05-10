@@ -23,9 +23,20 @@ export interface AudioSubmitResult {
   error?: string
 }
 
+export type HotkeyId = 'toggle' | 'settings'
+
+export interface HotkeyBindings {
+  toggle: string | null
+  settings: string | null
+}
+
 export interface Settings {
   modelName: string
+  language: string
+  hotkeys: HotkeyBindings
 }
+
+export type RebindResult = { ok: true } | { ok: false; error: 'conflict-internal' | 'conflict-system' }
 
 export interface ModelInfo {
   name: string
@@ -57,6 +68,8 @@ export type WindowVoiceCastApi = {
   listModels: () => Promise<ModelInfo[]>
   downloadModel: (name: string) => Promise<{ ok: boolean; error?: string }>
   onModelProgress: (cb: (payload: ModelProgress) => void) => () => void
+  rebindHotkey: (which: HotkeyId, accelerator: string | null) => Promise<RebindResult>
+  setHotkeyListening: (listening: boolean) => Promise<void>
 }
 
 declare global {

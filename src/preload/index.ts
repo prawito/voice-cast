@@ -7,7 +7,9 @@ import type {
   AudioSubmitResult,
   Settings,
   ModelInfo,
-  ModelProgress
+  ModelProgress,
+  HotkeyId,
+  RebindResult
 } from '../shared/types'
 
 const api: WindowVoiceCastApi = {
@@ -45,6 +47,12 @@ const api: WindowVoiceCastApi = {
     const listener = (_e: unknown, payload: ModelProgress) => cb(payload)
     ipcRenderer.on(IPC.MODEL_PROGRESS, listener)
     return () => ipcRenderer.removeListener(IPC.MODEL_PROGRESS, listener)
+  },
+  rebindHotkey(which: HotkeyId, accelerator: string | null): Promise<RebindResult> {
+    return ipcRenderer.invoke(IPC.HOTKEY_REBIND, { which, accelerator })
+  },
+  setHotkeyListening(listening: boolean): Promise<void> {
+    return ipcRenderer.invoke(IPC.HOTKEY_LISTENING, listening)
   }
 }
 

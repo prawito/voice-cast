@@ -2,13 +2,26 @@ import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { EventEmitter } from 'node:events'
+import { HOTKEY_TOGGLE, HOTKEY_SETTINGS } from '../shared/constants'
+
+export interface HotkeyBindings {
+  toggle: string | null
+  settings: string | null
+}
 
 export interface Settings {
   modelName: string
+  language: string
+  hotkeys: HotkeyBindings
 }
 
 const DEFAULTS: Settings = {
-  modelName: 'small'
+  modelName: 'small',
+  language: 'id',
+  hotkeys: {
+    toggle: HOTKEY_TOGGLE,
+    settings: HOTKEY_SETTINGS
+  }
 }
 
 type Events = {
@@ -23,7 +36,11 @@ export class SettingsStore extends EventEmitter<Events> {
     try {
       const raw = await fs.readFile(this.filePath, 'utf-8')
       const parsed = JSON.parse(raw) as Partial<Settings>
-      this.current = { ...DEFAULTS, ...parsed }
+      this.current = {
+        ...DEFAULTS,
+        ...parsed,
+        hotkeys: { ...DEFAULTS.hotkeys, ...(parsed.hotkeys ?? {}) }
+      }
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code
       if (code !== 'ENOENT') {
@@ -39,7 +56,11 @@ export class SettingsStore extends EventEmitter<Events> {
   }
 
   async update(patch: Partial<Settings>): Promise<Settings> {
-    this.current = { ...this.current, ...patch }
+    this.current = {
+      ...this.current,
+      ...patch,
+      hotkeys: { ...this.current.hotkeys, ...(patch.hotkeys ?? {}) }
+    }
     await this.persist()
     this.emit('change', this.get())
     return this.get()

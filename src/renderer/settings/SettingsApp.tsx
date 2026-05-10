@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { ModelInfo, ModelProgress, Settings } from '../../shared/types'
+import type { HotkeyId, ModelInfo, ModelProgress, Settings } from '../../shared/types'
+import { LANGUAGES } from '../../shared/languages'
+import { HOTKEY_TOGGLE, HOTKEY_SETTINGS } from '../../shared/constants'
 import { ModelRow } from './ModelRow'
+import { HotkeyRow } from './HotkeyRow'
 
 export function SettingsApp() {
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -46,6 +49,22 @@ export function SettingsApp() {
     setSettings(updated)
   }
 
+  const handleLanguageChange = async (language: string) => {
+    const updated = await window.voicecast.updateSettings({ language })
+    setSettings(updated)
+  }
+
+  const handleRebind = async (which: HotkeyId, accelerator: string | null) => {
+    const result = await window.voicecast.rebindHotkey(which, accelerator)
+    if (result.ok) {
+      setSettings((prev) =>
+        prev ? { ...prev, hotkeys: { ...prev.hotkeys, [which]: accelerator } } : prev
+      )
+      return { ok: true as const }
+    }
+    return { ok: false as const, error: result.error }
+  }
+
   const handleDownload = async (name: string) => {
     setProgress((prev) => ({
       ...prev,
@@ -76,6 +95,58 @@ export function SettingsApp() {
           lambat. Tersimpan: {downloadedCount}/{models.length}.
         </p>
       </header>
+
+      <section className="mb-6">
+        <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-zinc-500">
+          Language
+        </h2>
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+          <label className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-zinc-300">Spoken language</span>
+            <select
+              value={settings?.language ?? 'id'}
+              onChange={(e) => handleLanguageChange(e.target.value)}
+              className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm text-zinc-100 focus:border-zinc-500 focus:outline-none"
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="mt-2 text-xs text-zinc-500">
+            Pilih sesuai bahasa yang akan kamu ucapkan. Auto-detect lebih lambat & kadang
+            salah-tebak — pilih bahasa spesifik kalau hasilnya tidak akurat.
+          </p>
+        </div>
+      </section>
+
+      <section className="mb-6">
+        <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-zinc-500">
+          Shortcuts
+        </h2>
+        <ul className="space-y-2">
+          <HotkeyRow
+            id="toggle"
+            label="Toggle Recording"
+            accelerator={settings?.hotkeys.toggle ?? null}
+            defaultAccelerator={HOTKEY_TOGGLE}
+            onRebind={(accel) => handleRebind('toggle', accel)}
+          />
+          <HotkeyRow
+            id="settings"
+            label="Open Settings"
+            accelerator={settings?.hotkeys.settings ?? null}
+            defaultAccelerator={HOTKEY_SETTINGS}
+            onRebind={(accel) => handleRebind('settings', accel)}
+          />
+        </ul>
+        <p className="mt-2 text-xs text-zinc-500">
+          Klik Change lalu tekan kombinasi tombol. ESC untuk batal. Clear akan unbind hotkey
+          (akses lewat tray menu).
+        </p>
+      </section>
 
       <section>
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-zinc-500">
