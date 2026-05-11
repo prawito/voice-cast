@@ -167,8 +167,25 @@ export function SettingsApp() {
       </section>
 
       <footer className="mt-8 border-t border-zinc-800 pt-4 text-xs text-zinc-500">
-        Settings tersimpan otomatis. Restart tidak diperlukan — perubahan model berlaku pada
-        transcription berikutnya.
+        <p>
+          Settings tersimpan otomatis. Restart tidak diperlukan — perubahan model berlaku pada
+          transcription berikutnya.
+        </p>
+        <p className="mt-4 flex items-center justify-center gap-1 text-center text-zinc-500">
+          <span>Made with</span>
+          <span aria-label="love" className="text-rose-400">
+            ♥
+          </span>
+          <span>by</span>
+          <a
+            href="https://prawito.com"
+            target="_blank"
+            rel="noreferrer"
+            className="cursor-pointer text-zinc-300 underline underline-offset-2 hover:text-zinc-100"
+          >
+            Prawito Hudoro
+          </a>
+        </p>
       </footer>
     </div>
   )

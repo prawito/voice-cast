@@ -9,7 +9,8 @@ export const IPC = {
   MODEL_DOWNLOAD: 'voicecast:model-download',
   MODEL_PROGRESS: 'voicecast:model-progress',
   HOTKEY_REBIND: 'voicecast:hotkey-rebind',
-  HOTKEY_LISTENING: 'voicecast:hotkey-listening'
+  HOTKEY_LISTENING: 'voicecast:hotkey-listening',
+  OPEN_EXTERNAL: 'voicecast:open-external'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

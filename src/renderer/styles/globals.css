@@ -6,10 +6,25 @@ html, body, #root {
   background: transparent;
   margin: 0;
   padding: 0;
+}
+
+html[data-page="indicator"],
+html[data-page="indicator"] body,
+html[data-page="indicator"] #root {
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
   overflow: hidden;
+}
+
+html[data-page="settings"],
+html[data-page="settings"] body {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+html[data-page="settings"] body {
+  min-height: 100vh;
 }
 
 @layer utilities {

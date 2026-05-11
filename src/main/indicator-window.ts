@@ -40,7 +40,8 @@ export class IndicatorWindow {
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
-        preload: join(__dirname, '../preload/index.cjs')
+        preload: join(__dirname, '../preload/index.cjs'),
+        additionalArguments: ['--voicecast-page=indicator']
       }
     })
 

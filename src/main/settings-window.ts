@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { IPC } from './ipc-channels'
@@ -24,10 +24,12 @@ export class SettingsWindow {
       minimizable: true,
       maximizable: false,
       show: false,
+      backgroundColor: '#09090b',
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
-        preload: join(__dirname, '../preload/index.cjs')
+        preload: join(__dirname, '../preload/index.cjs'),
+        additionalArguments: ['--voicecast-page=settings']
       }
     })
 
@@ -39,12 +41,23 @@ export class SettingsWindow {
       this.win?.show()
     })
 
+    this.win.webContents.setWindowOpenHandler(({ url }) => {
+      openExternalSafely(url)
+      return { action: 'deny' }
+    })
+
+    this.win.webContents.on('will-navigate', (event, url) => {
+      const current = this.win?.webContents.getURL() ?? ''
+      if (url !== current) {
+        event.preventDefault()
+        openExternalSafely(url)
+      }
+    })
+
     if (process.env.ELECTRON_RENDERER_URL) {
-      await this.win.loadURL(`${process.env.ELECTRON_RENDERER_URL}?page=settings`)
+      await this.win.loadURL(process.env.ELECTRON_RENDERER_URL)
     } else {
-      await this.win.loadFile(join(__dirname, '../renderer/index.html'), {
-        search: 'page=settings'
-      })
+      await this.win.loadFile(join(__dirname, '../renderer/index.html'))
     }
   }
 
@@ -61,5 +74,18 @@ export class SettingsWindow {
   close(): void {
     this.win?.close()
     this.win = null
+  }
+}
+
+function openExternalSafely(url: string): void {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      console.warn(`[VoiceCast] refused non-http(s) url from settings: ${url}`)
+      return
+    }
+    void shell.openExternal(parsed.toString())
+  } catch (err) {
+    console.warn(`[VoiceCast] openExternal failed for ${url}:`, err)
   }
 }

@@ -58,7 +58,10 @@ export interface ModelProgress {
   resuming?: boolean
 }
 
+export type VoiceCastPage = 'indicator' | 'settings'
+
 export type WindowVoiceCastApi = {
+  page: VoiceCastPage
   onState: (cb: (payload: StateUpdatePayload) => void) => () => void
   onRecordingStart: (cb: () => void) => () => void
   onRecordingStop: (cb: () => void) => () => void
@@ -70,6 +73,7 @@ export type WindowVoiceCastApi = {
   onModelProgress: (cb: (payload: ModelProgress) => void) => () => void
   rebindHotkey: (which: HotkeyId, accelerator: string | null) => Promise<RebindResult>
   setHotkeyListening: (listening: boolean) => Promise<void>
+  openExternal: (url: string) => Promise<void>
 }
 
 declare global {

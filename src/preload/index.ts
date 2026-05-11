@@ -9,10 +9,16 @@ import type {
   ModelInfo,
   ModelProgress,
   HotkeyId,
-  RebindResult
+  RebindResult,
+  VoiceCastPage
 } from '../shared/types'
 
+const PAGE_FLAG = '--voicecast-page='
+const pageArg = process.argv.find((a) => a.startsWith(PAGE_FLAG))?.slice(PAGE_FLAG.length)
+const page: VoiceCastPage = pageArg === 'settings' ? 'settings' : 'indicator'
+
 const api: WindowVoiceCastApi = {
+  page,
   onState(cb) {
     const listener = (_e: unknown, payload: StateUpdatePayload) => cb(payload)
     ipcRenderer.on(IPC.STATE_UPDATE, listener)
@@ -53,6 +59,9 @@ const api: WindowVoiceCastApi = {
   },
   setHotkeyListening(listening: boolean): Promise<void> {
     return ipcRenderer.invoke(IPC.HOTKEY_LISTENING, listening)
+  },
+  openExternal(url: string): Promise<void> {
+    return ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url)
   }
 }
 

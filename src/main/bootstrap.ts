@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, ipcMain, shell } from 'electron'
 import { IndicatorWindow } from './indicator-window'
 import { SettingsWindow } from './settings-window'
 import { createTray } from './tray'
@@ -170,6 +170,19 @@ export async function bootstrap(): Promise<void> {
   ipcMain.handle(IPC.HOTKEY_LISTENING, (_e, listening: boolean) => {
     if (listening) hotkey.pauseAll()
     else hotkey.resumeAll()
+  })
+
+  ipcMain.handle(IPC.OPEN_EXTERNAL, async (_e, url: string) => {
+    try {
+      const parsed = new URL(url)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        console.warn(`[VoiceCast] refused to open non-http(s) url: ${url}`)
+        return
+      }
+      await shell.openExternal(parsed.toString())
+    } catch (err) {
+      console.warn(`[VoiceCast] openExternal failed for ${url}:`, err)
+    }
   })
 
   controller.reset()

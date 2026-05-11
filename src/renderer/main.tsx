@@ -4,11 +4,12 @@ import { IndicatorApp } from './IndicatorApp'
 import { SettingsApp } from './settings/SettingsApp'
 import './styles/globals.css'
 
-const params = new URLSearchParams(window.location.search)
-const page = params.get('page')
+const page = window.voicecast?.page ?? 'indicator'
 
 const container = document.getElementById('root')
 if (!container) throw new Error('Root element missing')
+
+document.documentElement.dataset.page = page
 
 const Root = page === 'settings' ? SettingsApp : IndicatorApp
 

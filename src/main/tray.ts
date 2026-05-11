@@ -12,13 +12,16 @@ export interface TrayCallbacks {
 export function createTray(callbacks: TrayCallbacks): Tray {
   const iconPath = join(__dirname, '../../resources/iconTemplate.png')
   const image = nativeImage.createFromPath(iconPath)
+  if (image.isEmpty()) {
+    console.warn(`[VoiceCast] tray icon empty or missing at ${iconPath}`)
+  }
   image.setTemplateImage(true)
 
   const tray = new Tray(image)
-  tray.setToolTip('VoiceCast (idle)')
+  tray.setToolTip('VoiceCast')
 
   const menu = Menu.buildFromTemplate([
-    { label: 'VoiceCast — walking skeleton', enabled: false },
+    { label: 'VoiceCast', enabled: false },
     { type: 'separator' },
     { label: 'Settings…', click: () => callbacks.onSettings() },
     { type: 'separator' },
@@ -31,5 +34,6 @@ export function createTray(callbacks: TrayCallbacks): Tray {
     }
   ])
   tray.setContextMenu(menu)
+  tray.on('click', () => callbacks.onSettings())
   return tray
 }
