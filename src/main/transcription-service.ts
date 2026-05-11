@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import type { SettingsStore } from './settings-store'
+import type { ModelManager } from './model-manager'
 
 const require = createRequire(import.meta.url)
 
@@ -30,7 +31,7 @@ function configureShelljsForElectron(): void {
 }
 
 export class TranscriptionService {
-  constructor(private settings: SettingsStore) {}
+  constructor(private settings: SettingsStore, private models: ModelManager) {}
 
   async transcribe(wav: ArrayBuffer): Promise<string> {
     if (wav.byteLength === 0) {
@@ -42,6 +43,8 @@ export class TranscriptionService {
     const { modelName, language } = this.settings.get()
     console.log(`[VoiceCast] transcribing with model=${modelName}, language=${language}`)
 
+    await this.models.ensureLinked(modelName)
+
     const tmpFile = join(tmpdir(), `voicecast-${randomUUID()}.wav`)
     await fs.writeFile(tmpFile, Buffer.from(wav))
 
@@ -49,7 +52,6 @@ export class TranscriptionService {
       const { nodewhisper } = await import('nodejs-whisper')
       const result = await nodewhisper(tmpFile, {
         modelName,
-        autoDownloadModelName: modelName,
         removeWavFileAfterTranscription: false,
         whisperOptions: {
           language,

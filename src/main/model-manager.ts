@@ -1,5 +1,14 @@
 import { app } from 'electron'
-import { promises as fs, existsSync, createWriteStream, statSync, truncateSync } from 'node:fs'
+import {
+  promises as fs,
+  existsSync,
+  createWriteStream,
+  statSync,
+  truncateSync,
+  lstatSync,
+  readlinkSync,
+  unlinkSync
+} from 'node:fs'
 import { join } from 'node:path'
 import { EventEmitter } from 'node:events'
 import { request } from 'node:https'
@@ -48,11 +57,13 @@ type Events = {
 
 export class ModelManager extends EventEmitter<Events> {
   private modelsDir: string
+  private linkDir: string
   private downloading = new Set<string>()
 
   constructor() {
     super()
-    this.modelsDir = join(
+    this.modelsDir = join(app.getPath('userData'), 'models')
+    this.linkDir = join(
       app.getAppPath(),
       'node_modules',
       'nodejs-whisper',
@@ -72,6 +83,71 @@ export class ModelManager extends EventEmitter<Events> {
 
   isDownloaded(name: string): boolean {
     return existsSync(this.modelPath(name))
+  }
+
+  async migrateLegacyModels(): Promise<void> {
+    await fs.mkdir(this.modelsDir, { recursive: true })
+    if (!existsSync(this.linkDir)) return
+
+    let entries: string[]
+    try {
+      entries = await fs.readdir(this.linkDir)
+    } catch (err) {
+      console.warn('[VoiceCast] could not read whisper models dir:', err)
+      return
+    }
+
+    for (const entry of entries) {
+      if (!entry.startsWith('ggml-') || !entry.endsWith('.bin')) continue
+
+      const linkPath = join(this.linkDir, entry)
+      let stat
+      try {
+        stat = await fs.lstat(linkPath)
+      } catch {
+        continue
+      }
+      if (stat.isSymbolicLink()) continue
+
+      const realPath = join(this.modelsDir, entry)
+      try {
+        if (existsSync(realPath)) {
+          await fs.unlink(linkPath)
+        } else {
+          await fs.rename(linkPath, realPath)
+        }
+        await fs.symlink(realPath, linkPath)
+        console.log(`[VoiceCast] migrated model ${entry} to userData`)
+      } catch (err) {
+        console.warn(`[VoiceCast] failed to migrate ${entry}:`, err)
+      }
+    }
+  }
+
+  async ensureLinked(name: string): Promise<void> {
+    if (!MODELS.find((m) => m.name === name)) {
+      throw new Error(`Unknown model: ${name}`)
+    }
+
+    const fileName = `ggml-${name}.bin`
+    const realPath = join(this.modelsDir, fileName)
+    if (!existsSync(realPath)) {
+      throw new Error(
+        `Model "${name}" belum diunduh. Buka Settings untuk download dulu.`
+      )
+    }
+
+    const linkPath = join(this.linkDir, fileName)
+    try {
+      const stat = lstatSync(linkPath)
+      if (stat.isSymbolicLink() && readlinkSync(linkPath) === realPath) return
+      unlinkSync(linkPath)
+    } catch {
+      // doesn't exist — fall through to create
+    }
+
+    await fs.mkdir(this.linkDir, { recursive: true })
+    await fs.symlink(realPath, linkPath)
   }
 
   async download(name: string): Promise<void> {

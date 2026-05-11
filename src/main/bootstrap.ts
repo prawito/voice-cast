@@ -29,6 +29,7 @@ export async function bootstrap(): Promise<void> {
   await settings.load()
 
   const models = new ModelManager()
+  await models.migrateLegacyModels()
 
   const indicator = new IndicatorWindow()
   await indicator.create()
@@ -51,7 +52,7 @@ export async function bootstrap(): Promise<void> {
 
   const controller = new RecordingController()
   const hotkey = new HotkeyManager()
-  const transcription = new TranscriptionService(settings)
+  const transcription = new TranscriptionService(settings, models)
   const injection = new InjectionService()
 
   let recordingTimer: NodeJS.Timeout | null = null
@@ -101,8 +102,11 @@ export async function bootstrap(): Promise<void> {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         console.error('[VoiceCast] transcription error:', message)
-        controller.setError('transcription failed')
-        scheduleIdle(controller, indicator, 1500)
+        const userMessage = /belum diunduh/i.test(message)
+          ? 'model belum diunduh, buka Settings'
+          : 'transcription failed'
+        controller.setError(userMessage)
+        scheduleIdle(controller, indicator, 2500)
         return { ok: false, error: message }
       }
 
